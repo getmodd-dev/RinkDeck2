@@ -24,7 +24,6 @@ interface ArenaPlaylistProps {
   onAddFiles: (files: FileList) => void;
   onRemoveTrack: (trackId: string) => void;
   onClearDefaultTracks?: () => void;
-  onOpenPlexModal?: () => void;
 }
 
 // Memoized Track Row for butter-smooth scrolling and zero wasted re-renders
@@ -109,12 +108,6 @@ const PlaylistRow = memo(function PlaylistRow({
                 LOCAL
               </span>
             )}
-
-            {track.source === 'plex' && (
-              <span className="px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-mono shrink-0">
-                PLEX
-              </span>
-            )}
           </div>
 
           <div className="text-[11px] text-slate-400 truncate">
@@ -175,7 +168,6 @@ export default function ArenaPlaylist({
   onAddFiles,
   onRemoveTrack,
   onClearDefaultTracks,
-  onOpenPlexModal,
 }: ArenaPlaylistProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<'all' | 'included' | 'excluded'>('all');
@@ -303,18 +295,6 @@ export default function ArenaPlaylist({
             <Plus className="w-3.5 h-3.5" />
             <span>+ ADD MUSIC</span>
           </button>
-
-          {onOpenPlexModal && (
-            <button
-              type="button"
-              onClick={onOpenPlexModal}
-              title="Browse and import music from Plex Media Server"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 active:scale-95 text-amber-300 hover:text-white font-mono font-bold text-xs border border-amber-500/40 shadow-sm transition-all cursor-pointer shrink-0"
-            >
-              <Plus className="w-3.5 h-3.5 text-amber-400" />
-              <span>+ PLEX</span>
-            </button>
-          )}
 
           {hasDemoTracks && onClearDefaultTracks && (
             <button

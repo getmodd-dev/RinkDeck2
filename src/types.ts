@@ -15,52 +15,11 @@ export interface Track {
   genre?: string;
   fileSize?: string;
   addedAt: number;
-  source?: 'local' | 'demo' | 'plex';
+  source?: 'local' | 'demo';
   year?: number;
   trackNumber?: number;
   bitrate?: number;
   playlistCategory?: 'game' | 'player' | 'warmup' | 'general';
-  plexRatingKey?: string;
-  plexPartKey?: string;
-}
-
-export interface PlexStatus {
-  configured: boolean;
-  connected: boolean;
-  plexUrl?: string;
-  hasToken?: boolean;
-  serverName?: string;
-  version?: string;
-  error?: string;
-}
-
-export interface PlexLibrary {
-  key: string;
-  title: string;
-  type: string;
-  agent?: string;
-}
-
-export interface PlexPlaylist {
-  ratingKey: string;
-  key: string;
-  title: string;
-  duration?: number;
-  leafCount?: number;
-}
-
-export interface PlexTrack {
-  id: string;
-  ratingKey: string;
-  title: string;
-  artist: string;
-  album: string;
-  duration: number; // in seconds
-  mediaPartKey?: string;
-  format?: string;
-  bitrate?: number;
-  year?: number;
-  streamUrl: string;
 }
 
 export interface TrackMemory {
