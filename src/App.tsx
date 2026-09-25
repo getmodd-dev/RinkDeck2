@@ -37,6 +37,7 @@ import ArenaGoalDeck from './components/ArenaGoalDeck';
 import ArenaTransportBar from './components/ArenaTransportBar';
 import ArenaPlaylist from './components/ArenaPlaylist';
 import ProgramRosterModal from './components/ProgramRosterModal';
+import PlexIntegrationModal from './components/PlexIntegrationModal';
 import { CheckCircle } from 'lucide-react';
 
 export default function App() {
@@ -103,6 +104,7 @@ export default function App() {
   });
 
   const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
+  const [isPlexModalOpen, setIsPlexModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Active Goal Celebration (Decoupled from Arena Transport Bar)
@@ -150,7 +152,16 @@ export default function App() {
       // 2. Load IndexedDB local tracks
       const savedUserTracks = await loadSavedLocalTracks();
 
-      // 3. Built-in demo tracks as fallback (respect user removal)
+      // 3. Load saved Plex imported tracks
+      let savedPlexTracks: Track[] = [];
+      try {
+        const plexJson = localStorage.getItem('rinkdeck_plex_tracks');
+        if (plexJson) {
+          savedPlexTracks = JSON.parse(plexJson);
+        }
+      } catch {}
+
+      // 4. Built-in demo tracks as fallback (respect user removal)
       let hideDemoTracks = false;
       let removedDemoIds: string[] = [];
       try {
@@ -169,7 +180,7 @@ export default function App() {
       // Combine without duplicate IDs
       const seenIds = new Set<string>();
       const allTracks: Track[] = [];
-      [...serverTracks, ...savedUserTracks, ...initialTracks].forEach((t) => {
+      [...serverTracks, ...savedUserTracks, ...savedPlexTracks, ...initialTracks].forEach((t) => {
         if (!seenIds.has(t.id)) {
           seenIds.add(t.id);
           allTracks.push(t);
@@ -725,6 +736,32 @@ export default function App() {
     showToast('Removed all default demo audio files');
   }, [currentTrackId]);
 
+  // Import tracks selected from Plex Media Server
+  const handleImportPlexTracks = useCallback((importedTracks: Track[]) => {
+    let existingPlex: Track[] = [];
+    try {
+      const saved = localStorage.getItem('rinkdeck_plex_tracks');
+      if (saved) existingPlex = JSON.parse(saved);
+    } catch {}
+
+    const mergedPlex = [
+      ...importedTracks,
+      ...existingPlex.filter((ep) => !importedTracks.some((it) => it.id === ep.id)),
+    ];
+
+    try {
+      localStorage.setItem('rinkdeck_plex_tracks', JSON.stringify(mergedPlex));
+    } catch {}
+
+    setTracks((prev) => {
+      const seen = new Set(prev.map((t) => t.id));
+      const newItems = importedTracks.filter((t) => !seen.has(t.id));
+      return [...newItems, ...prev];
+    });
+
+    showToast(`Imported ${importedTracks.length} track(s) from Plex`);
+  }, []);
+
   // Team Selection & Persistence
   const handleSelectTeam = useCallback((teamId: string) => {
     setActiveGoalTeamId(teamId);
@@ -835,6 +872,7 @@ export default function App() {
           showToast(enabled ? 'Horn on Player: ENABLED' : 'Horn on Player: OFF');
         }}
         onOpenProgramRoster={() => setIsRosterModalOpen(true)}
+        onOpenPlexModal={() => setIsPlexModalOpen(true)}
         activeFormat={currentTrack?.format}
       />
 
@@ -882,6 +920,7 @@ export default function App() {
               onAddFiles={handleAddFiles}
               onRemoveTrack={handleRemoveTrack}
               onClearDefaultTracks={handleClearDefaultTracks}
+              onOpenPlexModal={() => setIsPlexModalOpen(true)}
             />
           </div>
         </div>
@@ -898,6 +937,14 @@ export default function App() {
         onSelectTeam={handleSelectTeam}
         onDeleteTeam={handleDeleteTeam}
         onAddTeam={handleAddTeam}
+      />
+
+      {/* Plex Media Server Integration Modal */}
+      <PlexIntegrationModal
+        isOpen={isPlexModalOpen}
+        onClose={() => setIsPlexModalOpen(false)}
+        onImportTracks={handleImportPlexTracks}
+        onPlayTrack={(track) => loadAndPlayTrack(track, true)}
       />
     </div>
   );

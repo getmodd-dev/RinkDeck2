@@ -9,6 +9,7 @@ import {
   Flame,
   Clock,
   Trash2,
+  Server,
 } from 'lucide-react';
 import { TeamGoalSoundboard } from '../types';
 import { playGoalHorn } from '../utils/goalHorn';
@@ -26,6 +27,7 @@ interface RinkDeckHeaderProps {
   playHornOnPlayerSelect: boolean;
   onToggleHornOnPlayerSelect: (enabled: boolean) => void;
   onOpenProgramRoster: () => void;
+  onOpenPlexModal?: () => void;
   activeFormat?: string;
 }
 
@@ -74,6 +76,7 @@ export default function RinkDeckHeader({
   playHornOnPlayerSelect,
   onToggleHornOnPlayerSelect,
   onOpenProgramRoster,
+  onOpenPlexModal,
 }: RinkDeckHeaderProps) {
   return (
     <header className="w-full h-11 bg-slate-950/95 border-b border-slate-800/90 px-2 sm:px-3 flex items-center justify-between gap-1.5 sm:gap-2 select-none shrink-0 z-20 overflow-hidden whitespace-nowrap">
@@ -194,6 +197,19 @@ export default function RinkDeckHeader({
           <Sliders className="w-3.5 h-3.5 text-sky-400" />
           <span className="hidden md:inline">ROSTER</span>
         </button>
+
+        {/* Plex Integration Button */}
+        {onOpenPlexModal && (
+          <button
+            type="button"
+            onClick={onOpenPlexModal}
+            title="Plex Media Server — Connect & stream audio library"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-mono font-bold transition-all active:scale-95 cursor-pointer shrink-0"
+          >
+            <Server className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden md:inline">PLEX</span>
+          </button>
+        )}
 
         {/* Horn on Player Select Toggle Button */}
         <button
