@@ -93,7 +93,7 @@ export default function ArenaTransportBar({
           <button
             type="button"
             onClick={onPrevTrack}
-            title="Previous Track"
+            title="Cue Previous Track (Ready on Deck)"
             className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 flex items-center justify-center border border-slate-700 cursor-pointer"
           >
             <SkipBack className="w-5 h-5 fill-current" />
@@ -124,7 +124,7 @@ export default function ArenaTransportBar({
           <button
             type="button"
             onClick={onNextTrack}
-            title="Next Track"
+            title="Cue Next Track (Ready on Deck)"
             className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 flex items-center justify-center border border-slate-700 cursor-pointer"
           >
             <SkipForward className="w-5 h-5 fill-current" />

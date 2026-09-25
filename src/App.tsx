@@ -343,8 +343,8 @@ export default function App() {
     };
   }, [queueOrder, currentTrackId, tracks, excludedTrackIds]);
 
-  // Next Track in Rotation (skips excluded goal tracks)
-  const handleNextTrack = useCallback(() => {
+  // Next Track in Rotation: Cues the next track in rotation without auto-playing
+  const handleNextTrack = useCallback((autoPlay = false) => {
     if (tracks.length === 0) return;
 
     const availableTracks = tracks.filter((t) => !excludedTrackIds.includes(t.id));
@@ -355,18 +355,22 @@ export default function App() {
     const nextTrack = pool[nextIndex];
 
     if (nextTrack) {
-      loadAndPlayTrack(nextTrack, true);
+      loadAndPlayTrack(nextTrack, autoPlay);
     }
   }, [tracks, excludedTrackIds, currentTrackId, loadAndPlayTrack]);
 
-  // Previous Track
-  const handlePrevTrack = useCallback(() => {
+  // Previous Track: Cues the previous track in rotation without auto-playing
+  const handlePrevTrack = useCallback((autoPlay = false) => {
     if (tracks.length === 0) return;
 
     const audio = GlobalAudioEngine.getAudioElement();
     if (audio.currentTime > 3) {
       audio.currentTime = 0;
       setCurrentTime(0);
+      if (!autoPlay && isPlaying) {
+        audio.pause();
+        setIsPlaying(false);
+      }
       return;
     }
 
@@ -378,9 +382,9 @@ export default function App() {
     const prevTrack = pool[prevIndex];
 
     if (prevTrack) {
-      loadAndPlayTrack(prevTrack, true);
+      loadAndPlayTrack(prevTrack, autoPlay);
     }
-  }, [tracks, excludedTrackIds, currentTrackId, loadAndPlayTrack]);
+  }, [tracks, excludedTrackIds, currentTrackId, isPlaying, loadAndPlayTrack]);
 
   // Stop Goal Celebration Audio
   const handleStopCelebration = useCallback(() => {
@@ -863,8 +867,8 @@ export default function App() {
             shuffleMode={settings.shuffleMode}
             onTogglePlay={handleTogglePlay}
             onStop={handleStop}
-            onNextTrack={handleNextTrack}
-            onPrevTrack={handlePrevTrack}
+            onNextTrack={() => handleNextTrack(false)}
+            onPrevTrack={() => handlePrevTrack(false)}
             onSeek={handleSeek}
             onCycleShuffle={handleCycleShuffle}
           />
