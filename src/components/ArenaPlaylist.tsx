@@ -109,6 +109,12 @@ const PlaylistRow = memo(function PlaylistRow({
                 LOCAL
               </span>
             )}
+
+            {track.source === 'plex' && (
+              <span className="px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-mono shrink-0">
+                PLEX
+              </span>
+            )}
           </div>
 
           <div className="text-[11px] text-slate-400 truncate">
@@ -173,6 +179,8 @@ export default function ArenaPlaylist({
 }: ArenaPlaylistProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<'all' | 'included' | 'excluded'>('all');
+  const [sortField, setSortField] = useState<'default' | 'artist' | 'album' | 'title'>('default');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Check if any default demo tracks remain
@@ -192,7 +200,7 @@ export default function ArenaPlaylist({
     return map;
   }, [goalButtons]);
 
-  // Filter tracks by filter tab and search query
+  // Filter and sort tracks by filter tab, search query, and sortField
   const filteredTracks = useMemo(() => {
     let list = tracks;
 
@@ -207,17 +215,44 @@ export default function ArenaPlaylist({
       list = list.filter((t) => {
         const titleMatch = t.title.toLowerCase().includes(q);
         const artistMatch = t.artist.toLowerCase().includes(q);
+        const albumMatch = t.album ? t.album.toLowerCase().includes(q) : false;
         const athlete = athleteTrackMap.get(t.id);
         const athleteMatch = athlete && (
           athlete.number.includes(q) ||
           athlete.athleteName.toLowerCase().includes(q)
         );
-        return titleMatch || artistMatch || athleteMatch;
+        return titleMatch || artistMatch || albumMatch || athleteMatch;
+      });
+    }
+
+    if (sortField !== 'default') {
+      list = [...list].sort((a, b) => {
+        let cmp = 0;
+        if (sortField === 'artist') {
+          cmp = (a.artist || '').localeCompare(b.artist || '', undefined, { sensitivity: 'base' });
+          if (cmp === 0) {
+            cmp = (a.album || '').localeCompare(b.album || '', undefined, { sensitivity: 'base' });
+          }
+          if (cmp === 0) {
+            cmp = (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' });
+          }
+        } else if (sortField === 'album') {
+          cmp = (a.album || '').localeCompare(b.album || '', undefined, { sensitivity: 'base' });
+          if (cmp === 0) {
+            cmp = (a.artist || '').localeCompare(b.artist || '', undefined, { sensitivity: 'base' });
+          }
+          if (cmp === 0) {
+            cmp = (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' });
+          }
+        } else if (sortField === 'title') {
+          cmp = (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' });
+        }
+        return sortDirection === 'asc' ? cmp : -cmp;
       });
     }
 
     return list;
-  }, [tracks, filterMode, searchQuery, excludedTrackIds, athleteTrackMap]);
+  }, [tracks, filterMode, searchQuery, sortField, sortDirection, excludedTrackIds, athleteTrackMap]);
 
   const includedCount = useMemo(
     () => tracks.filter((t) => !excludedTrackIds.includes(t.id)).length,
@@ -334,6 +369,43 @@ export default function ArenaPlaylist({
           >
             GOAL ONLY ({excludedCount})
           </button>
+        </div>
+
+        {/* Sorting Bar */}
+        <div className="flex items-center justify-between gap-1 text-[11px] font-mono px-0.5 pt-0.5">
+          <div className="flex items-center gap-1.5 overflow-x-auto">
+            <span className="text-slate-500 font-bold text-[10px]">SORT:</span>
+            {(['default', 'artist', 'album', 'title'] as const).map((field) => (
+              <button
+                key={field}
+                type="button"
+                onClick={() => {
+                  if (sortField === field && field !== 'default') {
+                    setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                  } else {
+                    setSortField(field);
+                    setSortDirection('asc');
+                  }
+                }}
+                className={`px-1.5 py-0.5 rounded text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
+                  sortField === field
+                    ? 'bg-sky-500 text-slate-950 font-black shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                {field === 'default' ? 'DEFAULT' : field.toUpperCase()}
+                {sortField === field && field !== 'default' && (
+                  <span className="ml-1 text-[9px]">
+                    {sortDirection === 'asc' ? '↑' : '↓'}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          <span className="text-[10px] text-slate-500 shrink-0">
+            {filteredTracks.length} song{filteredTracks.length === 1 ? '' : 's'}
+          </span>
         </div>
       </div>
 

@@ -524,7 +524,8 @@ async function startServer() {
     }
 
     try {
-      const response = await fetch(`${url}/playlists?playlistType=audio`, {
+      // Query all playlists without restrictive params, then filter
+      const response = await fetch(`${url}/playlists`, {
         headers: {
           "X-Plex-Token": token,
           Accept: "application/json",
@@ -537,16 +538,20 @@ async function startServer() {
 
       const data: any = await response.json();
       const metadata = data.MediaContainer?.Metadata || [];
-      const playlists = metadata.map((p: any) => ({
-        ratingKey: String(p.ratingKey),
-        key: p.key,
-        title: p.title,
-        duration: Math.round((p.duration || 0) / 1000),
-        leafCount: p.leafCount || 0,
-      }));
+      // Filter out video/photo playlists; keep audio and general music playlists
+      const playlists = metadata
+        .filter((p: any) => !p.playlistType || p.playlistType === "audio")
+        .map((p: any) => ({
+          ratingKey: String(p.ratingKey),
+          key: String(p.ratingKey), // Return ratingKey as the identifier
+          title: p.title || "Untitled Playlist",
+          duration: Math.round((p.duration || 0) / 1000),
+          leafCount: p.leafCount || 0,
+        }));
 
       res.json(playlists);
     } catch (err: any) {
+      console.error("[Plex Playlists] Error fetching playlists:", err);
       res.status(500).json({ error: err.message || "Failed to fetch Plex playlists" });
     }
   });
@@ -558,21 +563,36 @@ async function startServer() {
       return res.status(400).json({ error: "Plex is not configured" });
     }
 
-    const { sectionKey, playlistKey, query } = req.query as {
+    const { sectionKey, playlistKey, query, sort } = req.query as {
       sectionKey?: string;
       playlistKey?: string;
       query?: string;
+      sort?: string;
     };
 
     try {
       let endpoint = "";
       if (playlistKey) {
-        endpoint = `${url}/playlists/${playlistKey}/items`;
+        // Robust sanitization: strips any leading /playlists/, trailing /items, or extra slashes
+        const cleanPlaylistId = String(playlistKey)
+          .replace(/^\/?playlists\//, "")
+          .replace(/\/items\/?$/, "")
+          .replace(/^\/+|\/+$/g, "")
+          .trim();
+        endpoint = `${url}/playlists/${cleanPlaylistId}/items`;
       } else if (sectionKey) {
         if (query && query.trim()) {
           endpoint = `${url}/library/sections/${sectionKey}/search?type=10&query=${encodeURIComponent(query.trim())}`;
         } else {
-          endpoint = `${url}/library/sections/${sectionKey}/all?type=10&X-Plex-Container-Start=0&X-Plex-Container-Size=100`;
+          let sortParam = "artist.titleSort,album.titleSort,index";
+          if (sort === "album:asc") sortParam = "album.titleSort,index";
+          if (sort === "album:desc") sortParam = "album.titleSort:desc,index";
+          if (sort === "artist:asc") sortParam = "artist.titleSort,album.titleSort,index";
+          if (sort === "artist:desc") sortParam = "artist.titleSort:desc";
+          if (sort === "title:asc") sortParam = "titleSort";
+          if (sort === "title:desc") sortParam = "titleSort:desc";
+
+          endpoint = `${url}/library/sections/${sectionKey}/all?type=10&sort=${encodeURIComponent(sortParam)}&X-Plex-Container-Start=0&X-Plex-Container-Size=500`;
         }
       } else {
         return res.status(400).json({ error: "Either sectionKey or playlistKey is required" });
@@ -595,23 +615,32 @@ async function startServer() {
       const tracks = items.map((item: any) => {
         const mediaPart = item.Media?.[0]?.Part?.[0];
         const partKey = mediaPart?.key || "";
+        const artistName =
+          item.originalTitle ||
+          item.grandparentTitle ||
+          (item.type === "track" && item.parentTitle && !item.grandparentTitle ? "" : item.grandparentTitle) ||
+          "Unknown Artist";
+        const albumName = item.parentTitle || item.album || "Unknown Album";
+
         return {
           id: `plex-${item.ratingKey}`,
           ratingKey: String(item.ratingKey),
           title: item.title || "Untitled Track",
-          artist: item.originalTitle || item.grandparentTitle || "Unknown Artist",
-          album: item.parentTitle || "Unknown Album",
+          artist: artistName,
+          album: albumName,
           duration: Math.round((item.duration || 0) / 1000),
           mediaPartKey: partKey,
           format: (item.Media?.[0]?.audioCodec || "mp3").toUpperCase(),
           bitrate: item.Media?.[0]?.bitrate,
           year: item.year,
+          trackNumber: item.index || 0,
           streamUrl: `/api/plex/stream?key=${encodeURIComponent(partKey)}`,
         };
       });
 
       res.json(tracks);
     } catch (err: any) {
+      console.error("[Plex Tracks] Error fetching tracks:", err);
       res.status(500).json({ error: err.message || "Failed to fetch Plex tracks" });
     }
   });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Server,
   Music,
@@ -51,6 +51,10 @@ export default function PlexIntegrationModal({
   const [isLoadingTracks, setIsLoadingTracks] = useState(false);
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<string>>(new Set());
 
+  // Sorting State
+  const [sortField, setSortField] = useState<'artist' | 'album' | 'title' | 'default'>('artist');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
   // Fetch status on open
   useEffect(() => {
     if (isOpen) {
@@ -86,24 +90,33 @@ export default function PlexIntegrationModal({
         fetch('/api/plex/playlists'),
       ]);
 
-      if (libRes.ok) {
-        const libs: PlexLibrary[] = await libRes.json();
-        setLibraries(libs);
-        if (libs.length > 0 && !selectedLibraryKey && !selectedPlaylistKey) {
-          setSelectedLibraryKey(libs[0].key);
-        }
-      }
-
+      let firstPlaylistKey = '';
       if (plRes.ok) {
         const pls: PlexPlaylist[] = await plRes.json();
         setPlaylists(pls);
+        if (pls.length > 0) {
+          firstPlaylistKey = pls[0].ratingKey || pls[0].key;
+        }
+      }
+
+      if (libRes.ok) {
+        const libs: PlexLibrary[] = await libRes.json();
+        setLibraries(libs);
+        // If no selection yet, prefer first playlist if available, else first library
+        if (!selectedLibraryKey && !selectedPlaylistKey) {
+          if (firstPlaylistKey) {
+            setSelectedPlaylistKey(firstPlaylistKey);
+          } else if (libs.length > 0) {
+            setSelectedLibraryKey(libs[0].key);
+          }
+        }
       }
     } catch (err) {
       console.warn('Error fetching Plex collections:', err);
     }
   };
 
-  // Load tracks when library, playlist, or search changes
+  // Load tracks when library, playlist, search, or server-side sort changes
   useEffect(() => {
     if (!status?.connected) return;
 
@@ -117,6 +130,8 @@ export default function PlexIntegrationModal({
           endpoint = `/api/plex/tracks?sectionKey=${encodeURIComponent(selectedLibraryKey)}`;
           if (searchQuery.trim()) {
             endpoint += `&query=${encodeURIComponent(searchQuery.trim())}`;
+          } else {
+            endpoint += `&sort=${encodeURIComponent(`${sortField}:${sortOrder}`)}`;
           }
         } else {
           setIsLoadingTracks(false);
@@ -139,6 +154,39 @@ export default function PlexIntegrationModal({
     const timer = setTimeout(loadTracks, searchQuery ? 350 : 0);
     return () => clearTimeout(timer);
   }, [selectedLibraryKey, selectedPlaylistKey, searchQuery, status?.connected]);
+
+  // Client-side instant sorting of current track list
+  const sortedTracks = useMemo(() => {
+    if (sortField === 'default') return tracks;
+    const list = [...tracks];
+
+    list.sort((a, b) => {
+      let cmp = 0;
+      if (sortField === 'artist') {
+        cmp = (a.artist || '').localeCompare(b.artist || '', undefined, { sensitivity: 'base' });
+        if (cmp === 0) {
+          cmp = (a.album || '').localeCompare(b.album || '', undefined, { sensitivity: 'base' });
+        }
+        if (cmp === 0) {
+          cmp = (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' });
+        }
+      } else if (sortField === 'album') {
+        cmp = (a.album || '').localeCompare(b.album || '', undefined, { sensitivity: 'base' });
+        if (cmp === 0) {
+          cmp = (a.artist || '').localeCompare(b.artist || '', undefined, { sensitivity: 'base' });
+        }
+        if (cmp === 0) {
+          cmp = (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' });
+        }
+      } else if (sortField === 'title') {
+        cmp = (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' });
+      }
+
+      return sortOrder === 'asc' ? cmp : -cmp;
+    });
+
+    return list;
+  }, [tracks, sortField, sortOrder]);
 
   const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -315,18 +363,19 @@ export default function PlexIntegrationModal({
                     </div>
                     <div className="space-y-1">
                       {playlists.map((pl) => {
-                        const isSelected = selectedPlaylistKey === pl.key;
+                        const isSelected =
+                          selectedPlaylistKey === pl.ratingKey || selectedPlaylistKey === pl.key;
                         return (
                           <button
                             key={pl.ratingKey}
                             type="button"
                             onClick={() => {
-                              setSelectedPlaylistKey(pl.key);
+                              setSelectedPlaylistKey(pl.ratingKey || pl.key);
                               setSelectedLibraryKey('');
                             }}
                             className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-left font-mono text-xs font-bold transition-all cursor-pointer ${
                               isSelected
-                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50 shadow-sm'
                                 : 'text-slate-300 hover:bg-slate-900 hover:text-white'
                             }`}
                           >
@@ -335,7 +384,7 @@ export default function PlexIntegrationModal({
                               <span className="truncate">{pl.title}</span>
                             </span>
                             {pl.leafCount !== undefined && (
-                              <span className="text-[10px] text-slate-500 ml-1 shrink-0">
+                              <span className="text-[10px] text-slate-400 ml-1 shrink-0 font-normal">
                                 {pl.leafCount}
                               </span>
                             )}
@@ -366,7 +415,7 @@ export default function PlexIntegrationModal({
                             }}
                             className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-left font-mono text-xs font-bold transition-all cursor-pointer ${
                               isSelected
-                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50 shadow-sm'
                                 : 'text-slate-300 hover:bg-slate-900 hover:text-white'
                             }`}
                           >
@@ -423,6 +472,43 @@ export default function PlexIntegrationModal({
                 </div>
               </div>
 
+              {/* Sort Bar */}
+              <div className="px-3 py-1.5 bg-slate-950/80 border-b border-slate-800/80 flex items-center justify-between text-xs font-mono shrink-0">
+                <div className="flex items-center gap-1.5 overflow-x-auto">
+                  <span className="text-slate-500 font-bold text-[10px] sm:text-xs">SORT:</span>
+                  {(['artist', 'album', 'title', 'default'] as const).map((field) => (
+                    <button
+                      key={field}
+                      type="button"
+                      onClick={() => {
+                        if (sortField === field) {
+                          setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                        } else {
+                          setSortField(field);
+                          setSortOrder('asc');
+                        }
+                      }}
+                      className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                        sortField === field
+                          ? 'bg-amber-500 text-slate-950 shadow-sm'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                      }`}
+                    >
+                      {field === 'default' ? 'ORIGINAL' : field.toUpperCase()}
+                      {sortField === field && (
+                        <span className="ml-1 text-[10px]">
+                          {sortOrder === 'asc' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="text-[11px] text-slate-400 shrink-0 font-mono">
+                  {sortedTracks.length} song{sortedTracks.length === 1 ? '' : 's'}
+                </div>
+              </div>
+
               {/* Tracks List */}
               <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1">
                 {isLoadingTracks ? (
@@ -430,7 +516,7 @@ export default function PlexIntegrationModal({
                     <RefreshCw className="w-6 h-6 animate-spin text-amber-400" />
                     <p className="text-xs font-mono">Querying Plex Media Server...</p>
                   </div>
-                ) : tracks.length === 0 ? (
+                ) : sortedTracks.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-slate-500 gap-2 p-6 text-center">
                     <Music className="w-8 h-8 opacity-40" />
                     <p className="text-xs font-mono">
@@ -440,7 +526,7 @@ export default function PlexIntegrationModal({
                     </p>
                   </div>
                 ) : (
-                  tracks.map((track) => {
+                  sortedTracks.map((track) => {
                     const isSelected = selectedTrackIds.has(track.id);
                     return (
                       <div
@@ -472,11 +558,16 @@ export default function PlexIntegrationModal({
                             <p className="font-mono text-xs font-bold truncate text-white">
                               {track.title}
                             </p>
-                            <p className="text-[11px] text-slate-400 truncate">
-                              {track.artist}
-                              {track.album && track.album !== track.title
-                                ? ` • ${track.album}`
-                                : ''}
+                            <p className="text-[11px] text-slate-400 truncate flex items-center gap-1.5">
+                              <span className="text-amber-300/90 font-medium">{track.artist}</span>
+                              {track.album && (
+                                <>
+                                  <span className="text-slate-600">•</span>
+                                  <span className="text-slate-400 italic truncate max-w-[200px]">
+                                    {track.album}
+                                  </span>
+                                </>
+                              )}
                             </p>
                           </div>
                         </div>
