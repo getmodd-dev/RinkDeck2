@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  ipad-audio-player:
+    image: ipad-audio-player:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ipad-audio-player
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATA_DIR=/app/data
+    volumes:
+      # Persistent storage path mapping for music, horn, and settings
+      - /mnt/user/appdata/ipad-audio-player:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

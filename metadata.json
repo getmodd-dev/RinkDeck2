@@ -1,0 +1,8 @@
+{
+  "name": "Remix RinkDeck",
+  "description": "Raspberry Pi touchscreen music control interface for local media playback with track start position memory and seamless playlist randomization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

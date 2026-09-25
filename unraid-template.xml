@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>iPad-Audio-Player</Name>
+  <Repository>ghcr.io/grimesd/ipad-audio-player:latest</Repository>
+  <Registry>https://ghcr.io/</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/grimesd/ipad-audio-player</Support>
+  <Project>https://github.com/grimesd/ipad-audio-player</Project>
+  <Overview>Dedicated touchscreen web app &amp; PWA for iPad (and other tablets) with persistent track cue position memory, tactile DJ-grade controls, sleep timer, AirPlay/MediaSession background playback, and persistent Unraid storage.</Overview>
+  <Description>Dedicated touchscreen web app &amp; PWA for iPad (and other tablets) with persistent track cue position memory, tactile DJ-grade controls, sleep timer, AirPlay/MediaSession background playback, and persistent Unraid storage. Change the Repository to your own GHCR image or build locally if needed.</Description>
+  <Category>MediaApp:Music Status:Stable</Category>
+  <WebUI>http://[IP]:[PORT:3000]/</WebUI>
+  <TemplateURL/>
+  <Icon>https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/disc.svg</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="WebUI Port" Target="3000" Default="3000" Mode="tcp" Description="Port for the iPad Audio Player web interface (Default: 3000)" Type="Port" Display="always" Required="true" Mask="false">3000</Config>
+  <Config Name="Appdata Storage" Target="/app/data" Default="/mnt/user/appdata/ipad-audio-player" Mode="rw" Description="Unraid host path for persistent music files, goal horn, settings, and rosters" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/ipad-audio-player</Config>
+  <Config Name="Port Env" Target="PORT" Default="3000" Description="Internal server port (matches container port)" Type="Variable" Display="advanced" Required="false" Mask="false">3000</Config>
+</Container>
