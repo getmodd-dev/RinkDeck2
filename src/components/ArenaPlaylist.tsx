@@ -23,6 +23,7 @@ interface ArenaPlaylistProps {
   onToggleTrackExcluded: (trackId: string) => void;
   onAddFiles: (files: FileList) => void;
   onRemoveTrack: (trackId: string) => void;
+  onClearDefaultTracks?: () => void;
 }
 
 // Memoized Track Row for butter-smooth scrolling and zero wasted re-renders
@@ -140,13 +141,13 @@ const PlaylistRow = memo(function PlaylistRow({
           {isExcluded ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
         </button>
 
-        {/* Delete Local Track Button */}
-        {track.isLocalFile && (
+        {/* Delete Track Button */}
+        {onRemove && (
           <button
             type="button"
             onClick={onRemove}
-            title="Remove track from storage"
-            className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-rose-950/80 text-slate-400 hover:text-rose-300 border border-slate-700 transition-all"
+            title={track.source === 'demo' ? 'Remove default demo track' : 'Remove track from storage'}
+            className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-rose-950/80 text-slate-400 hover:text-rose-300 border border-slate-700 transition-all cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -166,10 +167,17 @@ export default function ArenaPlaylist({
   onToggleTrackExcluded,
   onAddFiles,
   onRemoveTrack,
+  onClearDefaultTracks,
 }: ArenaPlaylistProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<'all' | 'included' | 'excluded'>('all');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Check if any default demo tracks remain
+  const hasDemoTracks = useMemo(
+    () => tracks.some((t) => t.source === 'demo' || t.id.startsWith('demo-')),
+    [tracks]
+  );
 
   // Map athlete buttons to track IDs for quick badges
   const athleteTrackMap = useMemo(() => {
@@ -258,6 +266,23 @@ export default function ArenaPlaylist({
             <Plus className="w-3.5 h-3.5" />
             <span>+ ADD MUSIC</span>
           </button>
+
+          {hasDemoTracks && onClearDefaultTracks && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('Remove all default synthesizer demo tracks? This leaves only your uploaded songs.')) {
+                  onClearDefaultTracks();
+                }
+              }}
+              title="Remove default demo audio tracks"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 active:scale-95 text-rose-300 hover:text-white font-mono font-bold text-xs border border-rose-600/40 shadow-sm transition-all cursor-pointer shrink-0"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">REMOVE DEFAULTS</span>
+              <span className="sm:hidden">DEFAULTS</span>
+            </button>
+          )}
         </div>
 
         {/* Filter Tabs */}

@@ -150,11 +150,21 @@ export default function App() {
       // 2. Load IndexedDB local tracks
       const savedUserTracks = await loadSavedLocalTracks();
 
-      // 3. Built-in demo tracks as fallback
-      const initialTracks: Track[] = INITIAL_DEMO_TRACKS.map((demo) => ({
-        ...demo,
-        url: '',
-      }));
+      // 3. Built-in demo tracks as fallback (respect user removal)
+      let hideDemoTracks = false;
+      let removedDemoIds: string[] = [];
+      try {
+        hideDemoTracks = localStorage.getItem('rinkdeck_hide_demo_tracks') === 'true';
+        const savedRemoved = localStorage.getItem('rinkdeck_removed_demo_ids');
+        if (savedRemoved) removedDemoIds = JSON.parse(savedRemoved);
+      } catch {}
+
+      const initialTracks: Track[] = hideDemoTracks
+        ? []
+        : INITIAL_DEMO_TRACKS.filter((demo) => !removedDemoIds.includes(demo.id)).map((demo) => ({
+            ...demo,
+            url: '',
+          }));
 
       // Combine without duplicate IDs
       const seenIds = new Set<string>();
@@ -655,16 +665,65 @@ export default function App() {
     }
   }, []);
 
-  // Remove Track: Deletes from /app/data/tracks/ and local DB
+  // Remove Track: Deletes from /app/data/tracks/, local DB, or remembers removed demo tracks
   const handleRemoveTrack = useCallback(async (trackId: string) => {
     try {
       await fetch(`/api/tracks/${encodeURIComponent(trackId)}`, { method: 'DELETE' });
     } catch {}
     await deleteSavedLocalTrack(trackId);
-    setTracks((prev) => prev.filter((t) => t.id !== trackId && (t as any).filename !== trackId));
+
+    // If it's a default/demo track, remember removal so it doesn't respawn on reload
+    if (trackId.startsWith('demo-') || INITIAL_DEMO_TRACKS.some((d) => d.id === trackId)) {
+      try {
+        const saved = localStorage.getItem('rinkdeck_removed_demo_ids');
+        const list = saved ? JSON.parse(saved) : [];
+        if (!list.includes(trackId)) {
+          const next = [...list, trackId];
+          localStorage.setItem('rinkdeck_removed_demo_ids', JSON.stringify(next));
+          fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ removedDemoTrackIds: next }),
+          }).catch(() => {});
+        }
+      } catch {}
+    }
+
+    setTracks((prev) => {
+      const remaining = prev.filter((t) => t.id !== trackId && (t as any).filename !== trackId);
+      if (currentTrackId === trackId && remaining.length > 0) {
+        setCurrentTrackId(remaining[0].id);
+      }
+      return remaining;
+    });
     setExcludedTrackIds((prev) => prev.filter((id) => id !== trackId));
-    showToast('Track removed from /app/data');
-  }, []);
+    showToast('Track removed');
+  }, [currentTrackId]);
+
+  // Remove all default demo synthesizer audio tracks in 1-click
+  const handleClearDefaultTracks = useCallback(() => {
+    const demoIds = INITIAL_DEMO_TRACKS.map((t) => t.id);
+    try {
+      localStorage.setItem('rinkdeck_hide_demo_tracks', 'true');
+      localStorage.setItem('rinkdeck_removed_demo_ids', JSON.stringify(demoIds));
+      fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hideDemoTracks: true, removedDemoTrackIds: demoIds }),
+      }).catch(() => {});
+    } catch {}
+
+    setTracks((prev) => {
+      const remaining = prev.filter(
+        (t) => !demoIds.includes(t.id) && !t.id.startsWith('demo-') && t.source !== 'demo'
+      );
+      if (demoIds.includes(currentTrackId) && remaining.length > 0) {
+        setCurrentTrackId(remaining[0].id);
+      }
+      return remaining;
+    });
+    showToast('Removed all default demo audio files');
+  }, [currentTrackId]);
 
   // Team Selection & Persistence
   const handleSelectTeam = useCallback((teamId: string) => {
@@ -822,6 +881,7 @@ export default function App() {
               onToggleTrackExcluded={handleToggleTrackExcluded}
               onAddFiles={handleAddFiles}
               onRemoveTrack={handleRemoveTrack}
+              onClearDefaultTracks={handleClearDefaultTracks}
             />
           </div>
         </div>
